@@ -1,0 +1,66 @@
+{
+  "name": "nd-6-hw5",
+  "version": "1.0.0",
+  "main": "index.js",
+  "scripts": {
+    "dev:server": "nodemon --exec ts-node server.ts",
+    "build:server": "tsc",
+    "start:prod": "node dist/server.js",
+    "db:migrate": "npm run db:create & ts-node migrations/001_create_tables.ts",
+    "script:create-database": "ts-node scripts/createDatabase.ts",
+    "script:create-tables": "ts-node scripts/createTables.ts",
+
+    "post:insert": "ts-node scripts/posts/insert.ts",
+    "post:all": "ts-node scripts/posts/getAll.ts",
+    "post:id": "ts-node scripts/posts/getById.ts",
+    "post:update": "ts-node scripts/posts/update.ts",
+    "post:delete": "ts-node scripts/posts/delete.ts",
+
+    "video:insert": "ts-node scripts/videos/insert.ts",
+    "video:all": "ts-node scripts/videos/getAll.ts",
+    "video:paginate": "ts-node scripts/videos/paginate.ts",
+    "video:update": "ts-node scripts/videos/update.ts",
+    "video:find": "ts-node scripts/videos/find.ts",
+    "video:group": "ts-node scripts/videos/group.ts",
+    "video:top": "ts-node scripts/videos/top.ts"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/yhorodniy/nd-6-hw5.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/yhorodniy/nd-6-hw5/issues"
+  },
+  "homepage": "https://github.com/yhorodniy/nd-6-hw5#readme",
+  "description": "",
+  "devDependencies": {
+    "@types/bcrypt": "^6.0.0",
+    "@types/cors": "^2.8.19",
+    "@types/express": "^5.0.3",
+    "@types/jsonwebtoken": "^9.0.10",
+    "@types/node": "^24.0.13",
+    "@types/winston": "^2.4.4",
+    "nodemon": "^3.1.10",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.8.3"
+  },
+  "dependencies": {
+    "@types/bcryptjs": "^2.4.6",
+    "@types/pg": "^8.15.5",
+    "bcrypt": "^6.0.0",
+    "bcryptjs": "^3.0.2",
+    "cors": "^2.8.5",
+    "dotenv": "^17.2.0",
+    "express": "^5.1.0",
+    "fastest-validator": "^1.19.1",
+    "jsonwebtoken": "^9.0.2",
+    "knex": "^3.1.0",
+    "nd-6-hw6": "file:..",
+    "pg": "^8.16.3",
+    "winston": "^3.17.0",
+    "winston-daily-rotate-file": "^5.0.0"
+  }
+}

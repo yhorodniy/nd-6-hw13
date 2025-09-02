@@ -1,0 +1,31 @@
+{
+  "name": "nd-6-hw12",
+  "version": "1.0.0",
+  "main": "index.js",
+  "scripts": {
+    "deps:client": "npm --prefix ./client install",
+    "build:client": "npm --prefix ./client run build:client",
+    "deps:server": "npm --prefix ./server install",
+    "build:server": "npm --prefix ./server run build:server",
+    "migrate:server": "npm --prefix ./server run db:migrate",
+    "prod:client": "npm run deps:client & npm run build:client",
+    "prod:server": "npm run deps:server & npm run build:server",
+    "run:server": "npm --prefix ./server run start:prod",
+
+    "start:app": "prod:client & prod:server & npm run migrate:server & npm run run:server",
+
+    "start:dev": "npm --prefix ./client run dev:client & npm run migrate:server & npm --prefix ./server run dev:server"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/yhorodniy/nd-6-hw12.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/yhorodniy/nd-6-hw12/issues"
+  },
+  "homepage": "https://github.com/yhorodniy/nd-6-hw12#readme",
+  "description": ""
+}
