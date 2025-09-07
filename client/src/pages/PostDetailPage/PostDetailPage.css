@@ -49,12 +49,6 @@
     font-weight: 700;
 }
 
-.post-detail__date {
-    color: #666;
-    font-size: 0.95rem;
-    margin-bottom: 24px;
-}
-
 .post-detail__text {
     padding: 0 32px 32px;
     color: #444;
@@ -113,6 +107,23 @@
     margin-bottom: 24px;
     flex-wrap: wrap;
     gap: 12px;
+}
+
+.post-detail__info-left {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.post-detail__date {
+    color: #666;
+    font-size: 0.95rem;
+}
+
+.post-detail__author {
+    color: #888;
+    font-size: 0.875rem;
+    font-style: italic;
 }
 
 .post-detail__stats {

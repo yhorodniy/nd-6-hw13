@@ -1,3 +1,4 @@
+import 'reflect-metadata';
 import dotenv from 'dotenv';
 import express, { Application } from 'express';
 import cors from 'cors';
@@ -9,6 +10,7 @@ import { errorHandler } from './helpers/errorHandler';
 import { logger, requestLogger } from './helpers/logger';
 import { CLIENT_DIST } from './config/paths';
 import { triggerError } from './controller/newspostsController';
+import { initializeDatabase } from './config/database';
 
 dotenv.config();
 
@@ -33,6 +35,18 @@ app.use('/error', triggerError);
 
 app.use(errorHandler);
 
-app.listen(PORT, () => {
-    logger.info(`Server is running on http://localhost:${PORT}`);  
-});
+// Initialize database and start server
+const startServer = async () => {
+    try {
+        await initializeDatabase();
+        
+        app.listen(PORT, () => {
+            logger.info(`Server is running on http://localhost:${PORT}`);  
+        });
+    } catch (error) {
+        logger.error('Failed to start server:', error);
+        process.exit(1);
+    }
+};
+
+startServer();

@@ -1,6 +1,6 @@
 import { Request, Response, NextFunction } from 'express';
-import { ValidationError, NewspostsServiceError, AuthServiceError } from '../helpers/errors';
-import { logger } from '../helpers/logger';
+import { ValidationError, NewspostsServiceError, AuthServiceError } from './errors';
+import { logger } from './logger';
 import { ErrorResponse } from '../types/types';
 
 export const errorHandler = (error: Error, req: Request, res: Response, next: NextFunction): void => {

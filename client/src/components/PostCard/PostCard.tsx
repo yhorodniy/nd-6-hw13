@@ -31,8 +31,15 @@ const PostCard: React.FC<{ post: Post }> = ({ post }) => {
                     {post.excerpt || post.content.substring(0, 150) + '...'}
                 </p>
                 <div className="post-card__footer">
-                    <div className="post-card__date">
-                        {formatDate(post.created_at)}
+                    <div className="post-card__meta">
+                        <div className="post-card__date">
+                            {formatDate(post.created_at)}
+                        </div>
+                        {post.author_email && (
+                            <div className="post-card__author">
+                                By: {post.author_email}
+                            </div>
+                        )}
                     </div>
                     <div className="post-card__stats">
                         {(post.views_count || 0) > 0 && (

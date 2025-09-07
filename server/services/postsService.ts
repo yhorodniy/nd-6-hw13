@@ -1,10 +1,19 @@
-import { PaginatedResponse, Post, PostCreateRequest, PostUpdateRequest } from '../types/types';
-import { db } from '../config/database';
-import { BaseService } from './baseService';
+import { PaginatedResponse, Post as PostType, PostCreateRequest, PostUpdateRequest } from '../types/types';
+import { AppDataSource } from '../config/database';
+import { Post } from '../entities/Post';
+import { User } from '../entities/User';
+import { Category } from '../entities/Category';
+import { Repository } from 'typeorm';
 
-export class PostsService extends BaseService {
+export class PostsService {
+    private postRepository: Repository<Post>;
+    private userRepository: Repository<User>;
+    private categoryRepository: Repository<Category>;
+
     constructor() {
-        super('posts');
+        this.postRepository = AppDataSource.getRepository(Post);
+        this.userRepository = AppDataSource.getRepository(User);
+        this.categoryRepository = AppDataSource.getRepository(Category);
     }
 
     private createSlug(title: string): string {
@@ -28,44 +37,60 @@ export class PostsService extends BaseService {
         size: number = 10,
         category?: string,
         userId?: string
-    ): Promise<PaginatedResponse<Post>> {
+    ): Promise<PaginatedResponse<PostType>> {
         try {
-            let baseQuery = this.getQueryBuilder();
+            const queryBuilder = this.postRepository.createQueryBuilder('post')
+                .leftJoinAndSelect('post.author', 'author');
 
             if (userId) {
-                baseQuery = baseQuery.where(function() {
-                    this.where('is_published', true)
-                        .orWhere(function() {
-                            this.where('is_published', false)
-                                .andWhere('author_id', userId);
-                        });
-                });
+                queryBuilder.where(
+                    '(post.isPublished = :published OR (post.isPublished = :unpublished AND post.authorId = :userId))',
+                    { published: true, unpublished: false, userId }
+                );
             } else {
-                baseQuery = baseQuery.where('is_published', true);
+                queryBuilder.where('post.isPublished = :published', { published: true });
             }
 
             if (category) {
-                baseQuery = baseQuery.where('category', category);
+                queryBuilder.andWhere('post.category = :category', { category });
             }
 
-            const countQuery = baseQuery.clone().count('* as count').first();
-            const { count } = await this.executeQuery(countQuery);
-            const total = parseInt(count as string, 10);
-
-            const dataQuery = baseQuery.clone().select('*');
+            const total = await queryBuilder.getCount();
             
             const from = page * size;
-            const data = await this.executeQuery(
-                dataQuery
-                    .orderBy('created_at', 'desc')
-                    .limit(size)
-                    .offset(from)
-            );
-
+            const posts = await queryBuilder
+                .orderBy('post.createdAt', 'DESC')
+                .limit(size)
+                .offset(from)
+                .getMany();
+                
             const totalPages = Math.ceil(total / size);
 
+            const data = posts.map(post => ({
+                id: post.id,
+                title: post.title,
+                content: post.content,
+                excerpt: post.excerpt,
+                image: post.image,
+                category: post.category,
+                tags: post.tags,
+                author_id: post.authorId,
+                author_email: post.author?.email || 'Unknown',
+                is_published: post.isPublished,
+                is_featured: post.isFeatured,
+                views_count: post.viewsCount,
+                likes_count: post.likesCount,
+                slug: post.slug,
+                meta_title: post.metaTitle,
+                meta_description: post.metaDescription,
+                reading_time: post.readingTime,
+                created_at: post.createdAt.toISOString(),
+                updated_at: post.updatedAt.toISOString(),
+                published_at: post.publishedAt?.toISOString()
+            }));
+
             return {
-                data: data || [],
+                data,
                 pagination: {
                     page,
                     size,
@@ -78,101 +103,184 @@ export class PostsService extends BaseService {
         }
     }
 
-    async getPostById(id: string, userId?: string): Promise<Post> {
+    async getPostById(id: string, userId?: string): Promise<PostType> {
         try {
-            const post = await this.executeQuery(
-                this.getQueryBuilder().where('id', id).first()
-            );
+            const post = await this.postRepository.findOne({
+                where: { id },
+                relations: ['author']
+            });
 
             if (!post) {
                 throw new Error('Post not found');
             }
 
-            if (!post.is_published && post.author_id !== userId) {
+            if (!post.isPublished && post.authorId !== userId) {
                 throw new Error('Post not found or not accessible');
             }
 
-            if (post.is_published) {
-                await this.executeQuery(
-                    this.getQueryBuilder()
-                        .where('id', id)
-                        .update({ views_count: (post.views_count || 0) + 1 })
-                );
-                post.views_count = (post.views_count || 0) + 1;
+            if (post.isPublished) {
+                await this.postRepository.update(id, {
+                    viewsCount: post.viewsCount + 1
+                });
+                post.viewsCount = post.viewsCount + 1;
             }
 
-            return post;
+            return {
+                id: post.id,
+                title: post.title,
+                content: post.content,
+                excerpt: post.excerpt,
+                image: post.image,
+                category: post.category,
+                tags: post.tags,
+                author_id: post.authorId,
+                author_email: post.author?.email || 'Unknown',
+                is_published: post.isPublished,
+                is_featured: post.isFeatured,
+                views_count: post.viewsCount,
+                likes_count: post.likesCount,
+                slug: post.slug,
+                meta_title: post.metaTitle,
+                meta_description: post.metaDescription,
+                reading_time: post.readingTime,
+                created_at: post.createdAt.toISOString(),
+                updated_at: post.updatedAt.toISOString(),
+                published_at: post.publishedAt?.toISOString()
+            };
         } catch (error: any) {
             throw new Error(`Failed to fetch post: ${error.message}`);
         }
     }
 
-    async createPost(postData: PostCreateRequest, authorId: string): Promise<Post> {
+    async createPost(postData: PostCreateRequest, authorId: string): Promise<PostType> {
         try {
+            const author = await this.userRepository.findOne({
+                where: { id: authorId }
+            });
+
+            if (!author) {
+                throw new Error('Author not found');
+            }
+
             const slug = this.createSlug(postData.title);
             const readingTime = this.calculateReadingTime(postData.content);
             
-            const insertData = {
+            const post = this.postRepository.create({
                 ...postData,
-                author_id: authorId,
+                authorId,
                 slug,
-                reading_time: readingTime,
-                is_published: postData.is_published ?? true,
-                is_featured: postData.is_featured ?? false,
-                views_count: 0,
-                likes_count: 0,
-                created_at: new Date(),
-                updated_at: new Date()
+                readingTime,
+                isPublished: postData.is_published ?? true,
+                isFeatured: postData.is_featured ?? false,
+                viewsCount: 0,
+                likesCount: 0,
+                publishedAt: postData.is_published ? new Date() : undefined
+            });
+
+            const savedPost = await this.postRepository.save(post);
+
+            // Reload with author relation
+            const postWithAuthor = await this.postRepository.findOne({
+                where: { id: savedPost.id },
+                relations: ['author']
+            });
+
+            return {
+                id: savedPost.id,
+                title: savedPost.title,
+                content: savedPost.content,
+                excerpt: savedPost.excerpt,
+                image: savedPost.image,
+                category: savedPost.category,
+                tags: savedPost.tags,
+                author_id: savedPost.authorId,
+                author_email: postWithAuthor?.author?.email || author.email,
+                is_published: savedPost.isPublished,
+                is_featured: savedPost.isFeatured,
+                views_count: savedPost.viewsCount,
+                likes_count: savedPost.likesCount,
+                slug: savedPost.slug,
+                meta_title: savedPost.metaTitle,
+                meta_description: savedPost.metaDescription,
+                reading_time: savedPost.readingTime,
+                created_at: savedPost.createdAt.toISOString(),
+                updated_at: savedPost.updatedAt.toISOString(),
+                published_at: savedPost.publishedAt?.toISOString()
             };
-
-            const [post] = await this.executeQuery(
-                this.getQueryBuilder().insert(insertData).returning('*')
-            );
-
-            return post;
         } catch (error: any) {
             throw new Error(`Failed to create post: ${error.message}`);
         }
     }
 
-    async updatePost(id: string, postData: PostUpdateRequest, authorId: string): Promise<Post> {
+    async updatePost(id: string, postData: PostUpdateRequest, authorId: string): Promise<PostType> {
         try {
-            const existingPost = await this.executeQuery(
-                this.getQueryBuilder()
-                    .select('author_id', 'title', 'content')
-                    .where('id', id)
-                    .first()
-            );
+            const existingPost = await this.postRepository.findOne({
+                where: { id },
+                select: ['id', 'authorId', 'title', 'content']
+            });
 
             if (!existingPost) {
                 throw new Error('Post not found');
             }
 
-            if (existingPost.author_id !== authorId) {
+            if (existingPost.authorId !== authorId) {
                 throw new Error('Unauthorized: You can only update your own posts');
             }
 
-            const updateData: any = { 
-                ...postData,
-                updated_at: new Date()
-            };
+            const updateData: Partial<Post> = { ...postData };
 
             if (postData.title && postData.title !== existingPost.title) {
                 updateData.slug = this.createSlug(postData.title);
             }
 
             if (postData.content && postData.content !== existingPost.content) {
-                updateData.reading_time = this.calculateReadingTime(postData.content);
+                updateData.readingTime = this.calculateReadingTime(postData.content);
             }
 
-            const [updatedPost] = await this.executeQuery(
-                this.getQueryBuilder()
-                    .where('id', id)
-                    .update(updateData)
-                    .returning('*')
-            );
+            if (postData.is_published !== undefined) {
+                updateData.isPublished = postData.is_published;
+                if (postData.is_published && !existingPost.isPublished) {
+                    updateData.publishedAt = new Date();
+                }
+            }
 
-            return updatedPost;
+            if (postData.is_featured !== undefined) {
+                updateData.isFeatured = postData.is_featured;
+            }
+
+            await this.postRepository.update(id, updateData);
+
+            const updatedPost = await this.postRepository.findOne({
+                where: { id },
+                relations: ['author']
+            });
+
+            if (!updatedPost) {
+                throw new Error('Failed to retrieve updated post');
+            }
+
+            return {
+                id: updatedPost.id,
+                title: updatedPost.title,
+                content: updatedPost.content,
+                excerpt: updatedPost.excerpt,
+                image: updatedPost.image,
+                category: updatedPost.category,
+                tags: updatedPost.tags,
+                author_id: updatedPost.authorId,
+                author_email: updatedPost.author?.email || 'Unknown',
+                is_published: updatedPost.isPublished,
+                is_featured: updatedPost.isFeatured,
+                views_count: updatedPost.viewsCount,
+                likes_count: updatedPost.likesCount,
+                slug: updatedPost.slug,
+                meta_title: updatedPost.metaTitle,
+                meta_description: updatedPost.metaDescription,
+                reading_time: updatedPost.readingTime,
+                created_at: updatedPost.createdAt.toISOString(),
+                updated_at: updatedPost.updatedAt.toISOString(),
+                published_at: updatedPost.publishedAt?.toISOString()
+            };
         } catch (error: any) {
             throw new Error(`Failed to update post: ${error.message}`);
         }
@@ -180,34 +288,30 @@ export class PostsService extends BaseService {
 
     async deletePost(id: string, authorId: string): Promise<void> {
         try {
-            const existingPost = await this.executeQuery(
-                this.getQueryBuilder()
-                    .select('author_id')
-                    .where('id', id)
-                    .first()
-            );
+            const existingPost = await this.postRepository.findOne({
+                where: { id },
+                select: ['id', 'authorId']
+            });
 
             if (!existingPost) {
                 throw new Error('Post not found');
             }
 
-            if (existingPost.author_id !== authorId) {
+            if (existingPost.authorId !== authorId) {
                 throw new Error('Unauthorized: You can only delete your own posts');
             }
 
-            await this.executeQuery(
-                this.getQueryBuilder().where('id', id).delete()
-            );
+            await this.postRepository.delete(id);
         } catch (error: any) {
             throw new Error(`Failed to delete post: ${error.message}`);
         }
     }
 
-    async getCategories(): Promise<string[]> {
+    async getCategories(): Promise<any[]> {
         try {
-            const categories = await this.executeQuery(
-                db('categories').select('*').orderBy('name', 'asc')
-            );
+            const categories = await this.categoryRepository.find({
+                order: { name: 'ASC' }
+            });
             return categories;
         } catch (error: any) {
             throw new Error(`Failed to fetch categories: ${error.message}`);

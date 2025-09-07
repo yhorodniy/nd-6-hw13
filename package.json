@@ -1,5 +1,5 @@
 {
-  "name": "nd-6-hw12",
+  "name": "nd-6-hw13",
   "version": "1.0.0",
   "main": "index.js",
   "scripts": {
@@ -7,25 +7,35 @@
     "build:client": "npm --prefix ./client run build:client",
     "deps:server": "npm --prefix ./server install",
     "build:server": "npm --prefix ./server run build:server",
-    "migrate:server": "npm --prefix ./server run db:migrate",
-    "prod:client": "npm run deps:client & npm run build:client",
-    "prod:server": "npm run deps:server & npm run build:server",
+    
+    "typeorm:migration:run": "npm --prefix ./server run migration:run",
+    "typeorm:migration:generate": "npm --prefix ./server run migration:generate",
+    "typeorm:migration:revert": "npm --prefix ./server run migration:revert",
+    "typeorm:schema:sync": "npm --prefix ./server run schema:sync",
+    "typeorm:schema:drop": "npm --prefix ./server run schema:drop",
+    
+    "db:safe-setup": "npm --prefix ./server run db:safe-setup",
+    "load:demo-data": "npm --prefix ./server run load:demo-data",
+    
+    "prod:client": "npm run deps:client && npm run build:client",
+    "prod:server": "npm run deps:server && npm run build:server",
     "run:server": "npm --prefix ./server run start:prod",
 
-    "start:app": "prod:client & prod:server & npm run migrate:server & npm run run:server",
+    "setup:db": "npm run db:safe-setup && npm run load:demo-data",
+    "start:app": "npm run prod:client && npm run prod:server && npm run setup:db && npm run run:server",
 
-    "start:dev": "npm --prefix ./client run dev:client & npm run migrate:server & npm --prefix ./server run dev:server"
+    "start:dev": "npm --prefix ./client run dev:client & npm --prefix ./server run dev:server"
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/yhorodniy/nd-6-hw12.git"
+    "url": "git+https://github.com/yhorodniy/nd-6-hw13.git"
   },
   "keywords": [],
   "author": "",
   "license": "ISC",
   "bugs": {
-    "url": "https://github.com/yhorodniy/nd-6-hw12/issues"
+    "url": "https://github.com/yhorodniy/nd-6-hw13/issues"
   },
-  "homepage": "https://github.com/yhorodniy/nd-6-hw12#readme",
+  "homepage": "https://github.com/yhorodniy/nd-6-hw13#readme",
   "description": ""
 }

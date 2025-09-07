@@ -1,27 +1,26 @@
-import { db } from '../config/database';
+import { AppDataSource } from '../config/database';
+import { User } from '../entities/User';
 import bcrypt from 'bcrypt';
 import jwt from 'jsonwebtoken';
 import { ValidationError, AuthServiceError } from '../helpers/errors';
 import { LoginResponse, UserCreateRequest } from '../types/types';
-import { BaseService } from './baseService';
+import { Repository } from 'typeorm';
 
-export class UserService extends BaseService {
+export class UserService {
     private static readonly SALT_ROUNDS = 10;
     private static readonly JWT_SECRET = process.env.JWT_SECRET || '1234567890abcdef';
     private static readonly JWT_EXPIRES_IN = '7d';
+    private userRepository: Repository<User>;
 
     constructor() {
-        super('users');
+        this.userRepository = AppDataSource.getRepository(User);
     }
 
     async createUser(userData: UserCreateRequest): Promise<LoginResponse> {
         try {
-            const existingUser = await this.executeQuery(
-                this.getQueryBuilder()
-                    .select('id')
-                    .where('email', userData.email)
-                    .first()
-            );
+            const existingUser = await this.userRepository.findOne({
+                where: { email: userData.email }
+            });
 
             if (existingUser) {
                 throw new AuthServiceError('User with this email already exists', 409);
@@ -29,21 +28,17 @@ export class UserService extends BaseService {
 
             const passwordHash = await bcrypt.hash(userData.password, UserService.SALT_ROUNDS);
 
-            const [user] = await this.executeQuery(
-                this.getQueryBuilder()
-                    .insert({
-                        email: userData.email,
-                        password_hash: passwordHash,
-                        created_at: new Date(),
-                        updated_at: new Date()
-                    })
-                    .returning(['id', 'email'])
-            );
+            const user = this.userRepository.create({
+                email: userData.email,
+                passwordHash: passwordHash
+            });
+
+            const savedUser = await this.userRepository.save(user);
 
             const token = jwt.sign(
                 { 
-                    userId: user.id, 
-                    email: user.email 
+                    userId: savedUser.id, 
+                    email: savedUser.email 
                 },
                 UserService.JWT_SECRET,
                 { expiresIn: UserService.JWT_EXPIRES_IN }
@@ -52,8 +47,8 @@ export class UserService extends BaseService {
             return {
                 token,
                 user: {
-                    id: user.id,
-                    email: user.email
+                    id: savedUser.id,
+                    email: savedUser.email
                 }
             };
         } catch (error: any) {
@@ -66,18 +61,16 @@ export class UserService extends BaseService {
 
     async loginUser(email: string, password: string): Promise<LoginResponse> {
         try {
-            const user = await this.executeQuery(
-                this.getQueryBuilder()
-                    .select('id', 'email', 'password_hash')
-                    .where('email', email)
-                    .first()
-            );
+            const user = await this.userRepository.findOne({
+                where: { email },
+                select: ['id', 'email', 'passwordHash']
+            });
 
             if (!user) {
                 throw new AuthServiceError('Invalid email or password', 401);
             }
 
-            const isPasswordValid = await bcrypt.compare(password, user.password_hash);
+            const isPasswordValid = await bcrypt.compare(password, user.passwordHash);
 
             if (!isPasswordValid) {
                 throw new AuthServiceError('Invalid email or password', 401);
@@ -109,12 +102,10 @@ export class UserService extends BaseService {
 
     async getUserById(id: string) {
         try {
-            const user = await this.executeQuery(
-                this.getQueryBuilder()
-                    .select('id', 'email', 'created_at', 'updated_at')
-                    .where('id', id)
-                    .first()
-            );
+            const user = await this.userRepository.findOne({
+                where: { id },
+                select: ['id', 'email', 'createdAt', 'updatedAt']
+            });
 
             if (!user) {
                 throw new AuthServiceError('User not found', 404);

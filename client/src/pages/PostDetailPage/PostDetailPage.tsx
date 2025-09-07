@@ -105,8 +105,15 @@ const PostDetailPage: React.FC = () => {
                         <div className="post-detail__excerpt">{post.excerpt}</div>
                     )}
                     <div className="post-detail__meta-info">
-                        <div className="post-detail__date">
-                            {formatDate(post.created_at)}
+                        <div className="post-detail__info-left">
+                            <div className="post-detail__date">
+                                {formatDate(post.created_at)}
+                            </div>
+                            {post.author_email && (
+                                <div className="post-detail__author">
+                                    By: {post.author_email}
+                                </div>
+                            )}
                         </div>
                         <div className="post-detail__stats">
                             {(post.views_count || 0) > 0 && (

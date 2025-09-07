@@ -7,6 +7,7 @@ export interface Post {
     category?: string;
     tags?: string[];
     author_id?: string;
+    author_email?: string;
     is_published?: boolean;
     is_featured?: boolean;
     views_count?: number;
